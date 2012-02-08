@@ -410,7 +410,7 @@ sub printAtStart {
 print<<"EOF";
 ---------------------------------------------------------------- 
  $0
- Copyright (C) 2011 Michael Imelfort
+ Copyright (C) 2011,2012 Michael Imelfort
     
  This program comes with ABSOLUTELY NO WARRANTY;
  This is free software, and you are welcome to redistribute it
@@ -427,7 +427,7 @@ __DATA__
 
 =head1 COPYRIGHT
 
-   copyright (C) 2011 Michael Imelfort
+   copyright (C) 2011,2012 Michael Imelfort
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
