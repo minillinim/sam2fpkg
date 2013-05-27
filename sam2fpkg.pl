@@ -43,6 +43,8 @@ BEGIN {
 
 # get input params and print copyright
 printAtStart();
+my $global_show_progress = 1;
+my $global_show_status = 1;
 my $options = checkParams();
 
 ######################################################################
@@ -84,7 +86,7 @@ my %global_non_ORF_map = ();
 my %global_non_ORF_frag_counts_map = ();
 
 # first open the reference file and work out which contigs we're mapping against
-print "Parsing reference sequence file: ". $options->{'ref'} . "\n";
+if($global_show_status == 1) { print "Parsing reference sequence file: ". $options->{'ref'} . "\n"; }
 open my $ref_fh, "<", $options->{'ref'} or die "**ERROR: could not open reference file $!\n";
 
 my $seq = "";
@@ -96,7 +98,7 @@ while(<$ref_fh>)
     {
         # header line - clean if up
         $_ =~ s/^>//;
-        print "\t adding contig: $_\n";
+        if($global_show_progress == 1) { print "\t adding contig: $_\n"; }
         
         if($header_ID != 0)
         {
@@ -130,7 +132,7 @@ if($header_ID != 0)
 close $ref_fh;
 
 # now open the gff file and work out the gene boundaries on these contigs
-print "Parsing gff file: ". $options->{'gff'} . "\n";
+if($global_show_status == 1) { print "Parsing gff file: ". $options->{'gff'} . "\n"; }
 open my $gff_fh, "<", $options->{'gff'} or die "**ERROR: could not open gff file $!\n";
 
 # use these to work out the unmapped regions
@@ -155,7 +157,7 @@ while(<$gff_fh>)
         #reset this guy
         $last_orf_end = 1;
         $last_con_ID = 0;
-        print "\n";
+        if($global_show_progress == 1) { print "\n"; }
     }
 
     if(exists $global_contig_headers{$con_ID})
@@ -193,10 +195,10 @@ if($last_con_ID != 0 and exists $global_contig_headers{$last_con_ID})
  
 close $gff_fh;
 
-print "Identified: $global_gene_count genes and $global_non_gene_count unmapped regions\n";
+if($global_show_status == 1) { print "Identified: $global_gene_count genes and $global_non_gene_count unmapped regions\n"; }
 
 # finally open the sam file and work out which reads hit where
-print "Parsing sam file: ". $options->{'sam'} . "\n";
+if($global_show_status == 1) { print "Parsing sam file: ". $options->{'sam'} . "\n"; }
 open my $sam_fh, "<", $options->{'sam'} or die "**ERROR: could not open sam file $!\n";
 while(<$sam_fh>)
 {
@@ -240,8 +242,8 @@ while(<$sam_fh>)
 close $sam_fh;
 
 # print out a heap of info
-print "Total mapped: $global_total_fragments_mapped\n";
-print "Mapped to ORFs: $global_total_ORF_fragments_mapped\n";
+if($global_show_status == 1) { print "Total mapped: $global_total_fragments_mapped\n"; }
+if($global_show_status == 1) { print "Mapped to ORFs: $global_total_ORF_fragments_mapped\n"; }
 print $out_fh "#***************************\n";
 print $out_fh "# ORFS\n";
 print $out_fh "#***************************\n";
@@ -251,7 +253,7 @@ foreach my $orf_ID (sort ORFSort (keys %global_ORF_map))
     my $orf_string = getString($orf_ID);
     my $num_mapped_to_orf = $global_ORF_frag_counts_map{$orf_ID};
     my $orf_length = $global_ORF_map{$orf_ID};
-    my $fpkg = ((($num_mapped_to_orf * 1000) / $orf_length) * 1000000) / $global_total_fragments_mapped;
+    my $fpkg = ($num_mapped_to_orf * 1000) / $orf_length;
     print $out_fh "$orf_string\t$fpkg\t$orf_length\t$num_mapped_to_orf\n";
 }
 print $out_fh "#***************************\n";
@@ -263,7 +265,7 @@ foreach my $orf_ID (sort ORFSort (keys %global_non_ORF_map))
     my $orf_string = getString($orf_ID);
     my $num_mapped_to_orf = $global_non_ORF_frag_counts_map{$orf_ID};
     my $orf_length = $global_non_ORF_map{$orf_ID};
-    my $fpkg = ((($num_mapped_to_orf * 1000) / $orf_length) * 1000000) / $global_total_fragments_mapped;
+    my $fpkg = ($num_mapped_to_orf * 1000) / $orf_length;
     print $out_fh "$orf_string\t$fpkg\t$orf_length\t$num_mapped_to_orf\n";
 }
 
@@ -310,7 +312,7 @@ sub addNewORF
     }
     # increment the total number of genes seen
     $global_gene_count++;
-    print "+";
+    if($global_show_progress == 1) { print "+"; }
 }
 
 sub addNewNonORF
@@ -331,7 +333,7 @@ sub addNewNonORF
         ${$global_non_gene_regions{$con_ID}}{$i} = $non_orf_ID;
     }
     $global_non_gene_count++;
-    print "-";
+    if($global_show_progress == 1) { print "-"; }
 }
 
 sub addString
@@ -382,7 +384,7 @@ sub getString
 # TEMPLATE SUBS
 ######################################################################
 sub checkParams {
-    my @standard_options = ( "help|h+", "sam|s:s", "gff|g:s", "ref|r:s", "out|o:s" );
+    my @standard_options = ( "help|h+", "sam|s:s", "gff|g:s", "ref|r:s", "out|o:s", "quiet|q+", "silent|s+" );
     my %options;
 
     # Add any other command line options, and the code to handle them
@@ -402,6 +404,10 @@ sub checkParams {
     if(!exists $options{'gff'} ) { print "**ERROR: You need to supply a gff file\n"; exec("pod2usage $0"); }
     if(!exists $options{'ref'} ) { print "**ERROR: You need to supply a reference sequence file\n"; exec("pod2usage $0"); }
     #if(!exists $options{''} ) { print "**ERROR: \n"; exec("pod2usage $0"); }
+
+    # set verbosity
+    if( exists $options{'quiet'} ) { $global_show_progress = 0; }
+    if( exists $options{'silent'} ) { $global_show_progress = 0; $global_show_status = 0; }
 
     return \%options;
 }
@@ -453,7 +459,9 @@ __DATA__
       -sam|s SAMFILE              Sam file to parse 
       -ref|r REFFILE              Reference sequence the reads were mapped to 
       -gff|g GFF3FILE             Gff3 file to parse
-      -out|o OUTFILE              File to print results to (default: SAMFILE.fpkg)
+      [ -out|o OUTFILE ]          File to print results to (default: SAMFILE.fpkg)
+      [-quiet -q]                 Suppress progress messages
+      [-silent -s]                Suppress all messages
       [-help -h]                  Displays basic usage information
          
 =cut
