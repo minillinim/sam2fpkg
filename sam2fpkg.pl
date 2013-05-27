@@ -6,6 +6,8 @@
 #    Converts a sam file to fpkg measurements - made for bacterial genomes
 #    with no introns.
 #
+#    Version: 0.2
+#
 #    Copyright (C) 2011,2012 Michael Imelfort
 #
 #    This program is free software: you can redistribute it and/or modify
