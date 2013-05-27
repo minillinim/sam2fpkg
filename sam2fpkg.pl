@@ -202,8 +202,8 @@ while(<$sam_fh>)
 {
     next if ($_ =~ /^@/);
     chomp $_;
-    my @sam_fields = split /\t/, $_;
-    my @mapping_flags = split //, dec2bin($sam_fields[1]);
+    my @sam_fields = split(/\t/, $_);
+    my @mapping_flags = split( //, dec2bin($sam_fields[1]));
     
     # make sure it mapped
     next if($mapping_flags[4] eq "1");
@@ -278,8 +278,8 @@ sub ORFSort {
     #-----
     # sort ORFs by contig and position
     #
-   my @a_fields = split /,/, getString($a); 
-   my @b_fields = split /,/, getString($b);
+   my @a_fields = split(/,/, getString($a)); 
+   my @b_fields = split(/,/, getString($b));
    
    if(int(getID($a_fields[0])) > int(getID($b_fields[0])))
    {
