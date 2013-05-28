@@ -33,6 +33,8 @@ use warnings;
 use Getopt::Long;
 
 #CPAN modules
+use Bio::DB::Sam;
+use Bio::DB::Sam::Constants;
 
 #locally-written modules
 
@@ -200,48 +202,88 @@ close $gff_fh;
 if($global_show_status == 1) { print "Identified: $global_gene_count genes and $global_non_gene_count unmapped regions\n"; }
 
 # finally open the sam file and work out which reads hit where
-if($global_show_status == 1) { print "Parsing sam file: ". $options->{'sam'} . "\n"; }
-open my $sam_fh, "<", $options->{'sam'} or die "**ERROR: could not open sam file $!\n";
-while(<$sam_fh>)
+if(exists $options->{'bam'})
 {
-    next if ($_ =~ /^@/);
-    chomp $_;
-    my @sam_fields = split(/\t/, $_);
-    my @mapping_flags = split( //, dec2bin($sam_fields[1]));
+    if($global_show_status == 1) { print "Parsing bam file: ". $options->{'sam'} . "\n"; }
+    my $sam_file = Bio::DB::Sam->new(-bam => $options->{'sam'}, -expand_flags => 1);
+    my @alignments = $sam_file->get_features_by_flag(UNMAPPED => 0);
     
-    # make sure it mapped
-    next if($mapping_flags[4] eq "1");
-    
-    # get the contig ID
-    # my $con_ID = getID($sam_fields[2]);
-    my $con_ID = $sam_fields[2];
-
-    if(0 != getID($con_ID))
+    foreach my $a (@alignments)
     {
-        # this is one of our guys!
-        # find the orf ID
-        if(exists ${$global_gene_regions{$con_ID}}{int($sam_fields[3])})
+        my $query_start  = $a->start;
+        my $seqid  = $a->seq_id;
+        # get the contig ID
+        my $con_ID  = $a->seq_id;
+        if(0 != getID($con_ID))
         {
-            # read mapped into an orf
-            my $orf_ID = ${$global_gene_regions{$con_ID}}{int($sam_fields[3])};
-            
-            # increment the local counter
-            $global_ORF_frag_counts_map{$orf_ID}++;
-            
-            # increment the ORF spceific counter
-            $global_total_ORF_fragments_mapped++;
+#            print "$seqid, $query_start\n";
+            # this is one of our guys!
+            # find the orf ID
+            if(exists ${$global_gene_regions{$con_ID}}{$query_start})
+            {
+                # read mapped into an orf
+                my $orf_ID = ${$global_gene_regions{$con_ID}}{$query_start};
+
+                # increment the local counter
+                $global_ORF_frag_counts_map{$orf_ID}++;
+
+                # increment the ORF spceific counter
+                $global_total_ORF_fragments_mapped++;
+            }
+            elsif(exists ${$global_non_gene_regions{$con_ID}}{$query_start})
+            {
+                # read mapped elsewhere...
+                my $non_orf_ID = ${$global_non_gene_regions{$con_ID}}{$query_start};
+            }
+
+            # up the total number mapped
+            $global_total_fragments_mapped++;
         }
-        elsif(exists ${$global_non_gene_regions{$con_ID}}{int($sam_fields[3])})
-        {
-            # read mapped elsewhere...
-            my $non_orf_ID = ${$global_non_gene_regions{$con_ID}}{int($sam_fields[3])};
-        }
-        
-        # up the total number mapped
-        $global_total_fragments_mapped++;
     }
 }
-close $sam_fh;
+else
+{
+    if($global_show_status == 1) { print "Parsing sam file: ". $options->{'sam'} . "\n"; }
+    open my $sam_fh, "<", $options->{'sam'} or die "**ERROR: could not open sam file $!\n";
+    while(<$sam_fh>)
+    {
+        next if ($_ =~ /^@/);
+        chomp $_;
+        my @sam_fields = split(/\t/, $_);
+        
+        next if($sam_fields[1] & 0x4);
+    
+        # get the contig ID
+        # my $con_ID = getID($sam_fields[2]);
+        my $con_ID = $sam_fields[2];
+
+        if(0 != getID($con_ID))
+        {
+            # this is one of our guys!
+            # find the orf ID
+            if(exists ${$global_gene_regions{$con_ID}}{int($sam_fields[3])})
+            {
+                # read mapped into an orf
+                my $orf_ID = ${$global_gene_regions{$con_ID}}{int($sam_fields[3])};
+            
+                # increment the local counter
+                $global_ORF_frag_counts_map{$orf_ID}++;
+            
+                # increment the ORF spceific counter
+                $global_total_ORF_fragments_mapped++;
+            }
+            elsif(exists ${$global_non_gene_regions{$con_ID}}{int($sam_fields[3])})
+            {
+                # read mapped elsewhere...
+                my $non_orf_ID = ${$global_non_gene_regions{$con_ID}}{int($sam_fields[3])};
+            }
+        
+            # up the total number mapped
+            $global_total_fragments_mapped++;
+        }
+    }
+    close $sam_fh;
+}
 
 # print out a heap of info
 if($global_show_status == 1) { print "Total mapped: $global_total_fragments_mapped\n"; }
@@ -386,7 +428,7 @@ sub getString
 # TEMPLATE SUBS
 ######################################################################
 sub checkParams {
-    my @standard_options = ( "help|h+", "sam|s:s", "gff|g:s", "ref|r:s", "out|o:s", "quiet|q+", "silent|s+" );
+    my @standard_options = ( "help|h+", "sam|s:s", "gff|g:s", "ref|r:s", "out|o:s", "quiet|q+", "silent|l+", "bam|b+" );
     my %options;
 
     # Add any other command line options, and the code to handle them
@@ -461,9 +503,10 @@ __DATA__
       -sam|s SAMFILE              Sam file to parse 
       -ref|r REFFILE              Reference sequence the reads were mapped to 
       -gff|g GFF3FILE             Gff3 file to parse
-      [ -out|o OUTFILE ]          File to print results to (default: SAMFILE.fpkg)
-      [-quiet -q]                 Suppress progress messages
-      [-silent -s]                Suppress all messages
-      [-help -h]                  Displays basic usage information
+      [-bam|b]                    Input mapping is in BAM format
+      [-out|o OUTFILE]            File to print results to (default: SAMFILE.fpkg)
+      [-quiet|q]                  Suppress progress messages
+      [-silent|s]                 Suppress all messages
+      [-help|h]                   Displays basic usage information
          
 =cut
