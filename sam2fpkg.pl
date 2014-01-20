@@ -6,7 +6,7 @@
 #    Converts a sam file to fpkg measurements - made for bacterial genomes
 #    with no introns.
 #
-#    Version: 0.2
+#    Version: 0.3
 #
 #    Copyright (C) 2011,2012 Michael Imelfort
 #
@@ -251,7 +251,7 @@ else
         chomp $_;
         my @sam_fields = split(/\t/, $_);
         
-        next if($sam_fields[1] & 0x4);
+        next if($sam_fields[1] & 0x904);
     
         # get the contig ID
         # my $con_ID = getID($sam_fields[2]);
